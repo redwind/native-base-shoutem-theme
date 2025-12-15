@@ -4,6 +4,11 @@ import Theme, { ThemeShape } from './Theme';
 import normalizeStyle from './StyleNormalizer/normalizeStyle';
 
 /**
+ * Theme context for providing theme to child components.
+ */
+export const ThemeContext = React.createContext(null);
+
+/**
  *  Provides a theme to child components trough context.
  */
 export default class StyleProvider extends React.Component {
@@ -16,29 +21,22 @@ export default class StyleProvider extends React.Component {
     style: {},
   };
 
-  static childContextTypes = {
-    theme: ThemeShape.isRequired,
-  };
-
   constructor(props, context) {
     super(props, context);
     this.state = {
       theme: this.createTheme(props),
+      prevStyle: props.style,
     };
   }
 
-  getChildContext() {
-    return {
-      theme: this.state.theme,
-    };
-  }
-
-  UNSAFE_componentWillReceiveProps(nextProps) {
-    if (nextProps.style !== this.props.style) {
-      this.setState({
-        theme: this.createTheme(nextProps),
-      });
+  static getDerivedStateFromProps(nextProps, prevState) {
+    if (nextProps.style !== prevState.prevStyle) {
+      return {
+        theme: new Theme(nextProps.style),
+        prevStyle: nextProps.style,
+      };
     }
+    return null;
   }
 
   createTheme(props) {
@@ -47,7 +45,12 @@ export default class StyleProvider extends React.Component {
 
   render() {
     const { children } = this.props;
+    const { theme } = this.state;
 
-    return Children.only(children);
+    return (
+      <ThemeContext.Provider value={theme}>
+        {Children.only(children)}
+      </ThemeContext.Provider>
+    );
   }
 }
