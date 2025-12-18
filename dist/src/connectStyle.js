@@ -148,11 +148,11 @@ StyledComponent=function(_React$Component){_inherits(StyledComponent,_React$Comp
 
 
 
-function StyledComponent(props){_classCallCheck(this,StyledComponent);var _this=_possibleConstructorReturn(this,(StyledComponent.__proto__||Object.getPrototypeOf(StyledComponent)).call(this,
-props));
+function StyledComponent(props,context){_classCallCheck(this,StyledComponent);var _this=_possibleConstructorReturn(this,(StyledComponent.__proto__||Object.getPrototypeOf(StyledComponent)).call(this,
+props,context));
 var styleNames=_this.getStyleNames(props);
 var style=props.style;
-var theme=_this.context;
+var theme=context;
 
 var finalStyle=_this.getFinalStyle(
 props,

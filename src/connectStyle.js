@@ -148,11 +148,11 @@ export default (
       static displayName = `Styled(${componentDisplayName})`;
       static WrappedComponent = WrappedComponent;
 
-      constructor(props) {
-        super(props);
+      constructor(props, context) {
+        super(props, context);
         const styleNames = this.getStyleNames(props);
         const style = props.style;
-        const theme = this.context;
+        const theme = context;
 
         const finalStyle = this.getFinalStyle(
           props,
