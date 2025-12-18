@@ -5,8 +5,9 @@ import * as _ from 'lodash';
 import normalizeStyle from './StyleNormalizer/normalizeStyle';
 import { StyleSheet } from "react-native";
 
-import Theme, { ThemeShape } from "./Theme";
+import Theme from "./Theme";
 import { resolveComponentStyle } from "./resolveComponentStyle";
+import { ThemeContext } from "./StyleProvider";
 
 let themeCache = {};
 
@@ -31,16 +32,16 @@ function throwConnectStyleError(errorMessage, componentDisplayName) {
 }
 
 /**
- * Returns the theme object from the provided context,
- * or an empty theme if the context doesn't contain a theme.
+ * Returns the theme object from the provided theme value,
+ * or an empty theme if the theme value is null.
  *
- * @param context The React component context.
+ * @param themeValue The theme value from ThemeContext (can be null).
  * @returns {Theme} The Theme object.
  */
-function getTheme(context) {
+function getTheme(themeValue) {
   // Fallback to a default theme if the component isn't
   // rendered in a StyleProvider.
-  return context.theme || Theme.getDefaultTheme();
+  return themeValue || Theme.getDefaultTheme();
 }
 
 /**
@@ -121,19 +122,7 @@ export default (
     }
 
     class StyledComponent extends React.Component {
-      static contextTypes = {
-        theme: ThemeShape,
-        // The style inherited from the parent
-        // parentStyle: PropTypes.object,
-        parentPath: PropTypes.array
-      };
-
-      static childContextTypes = {
-        // Provide the parent style to child components
-        // parentStyle: PropTypes.object,
-        // resolveStyle: PropTypes.func,
-        parentPath: PropTypes.array
-      };
+      static contextType = ThemeContext;
 
       static propTypes = {
         // Element style that overrides any other style of the component
@@ -159,15 +148,15 @@ export default (
       static displayName = `Styled(${componentDisplayName})`;
       static WrappedComponent = WrappedComponent;
 
-      constructor(props, context) {
-        super(props, context);
-        // console.log(context.parentPath);
+      constructor(props) {
+        super(props);
         const styleNames = this.getStyleNames(props);
         const style = props.style;
+        const theme = this.context;
 
         const finalStyle = this.getFinalStyle(
           props,
-          context,
+          theme,
           style,
           styleNames
         );
@@ -186,19 +175,9 @@ export default (
         };
       }
 
-      getFinalStyle(props, context, style, styleNames) {
-        let resolvedStyle = {};
-        if (context.parentPath) {
-          resolvedStyle = this.getOrSetStylesInCache(
-            context,
-            props,
-            styleNames,
-            [...context.parentPath, componentStyleName, ...styleNames]
-          );
-        } else {
-          resolvedStyle = this.resolveStyle(context, props, styleNames);
-          themeCache[componentStyleName] = resolvedStyle;
-        }
+      getFinalStyle(props, theme, style, styleNames) {
+        const resolvedStyle = this.resolveStyle(theme, props, styleNames);
+        themeCache[componentStyleName] = resolvedStyle;
 
         const concreteStyle = getConcreteStyle(_.merge({}, resolvedStyle));
 
@@ -228,42 +207,21 @@ export default (
         return styleNamesArr;
       }
 
-      getParentPath() {
-        if (!this.context.parentPath) {
-          return [componentStyleName];
-        } else {
-          return [
-            ...this.context.parentPath,
-            componentStyleName,
-            ...this.getStyleNames(this.props)
-          ];
-        }
-      }
-
-      getChildContext() {
-        return {
-          // parentStyle: this.props.virtual ?
-          //   this.context.parentStyle :
-          //   this.state.childrenStyle,
-          // resolveStyle: this.resolveConnectedComponentStyle,
-          parentPath: this.getParentPath()
-        };
-      }
-
-      UNSAFE_componentWillReceiveProps(nextProps, nextContext) {
+      UNSAFE_componentWillReceiveProps(nextProps) {
         const styleNames = this.getStyleNames(nextProps);
         const style = nextProps.style;
-        if (this.shouldRebuildStyle(nextProps, nextContext, styleNames)) {
+        const theme = this.context;
+        
+        if (this.shouldRebuildStyle(nextProps, theme, styleNames)) {
           const finalStyle = this.getFinalStyle(
             nextProps,
-            nextContext,
+            theme,
             style,
             styleNames
           );
 
           this.setState({
             style: finalStyle,
-            // childrenStyle: resolvedStyle.childrenStyle,
             styleNames
           });
         }
@@ -294,12 +252,11 @@ export default (
         );
       }
 
-      shouldRebuildStyle(nextProps, nextContext, styleNames) {
+      shouldRebuildStyle(nextProps, theme, styleNames) {
         return (
           nextProps.style !== this.props.style ||
           nextProps.styleName !== this.props.styleName ||
-          nextContext.theme !== this.context.theme ||
-          !_.isEqual(nextContext.parentPath, this.context.parentPath) ||
+          theme !== this.context ||
           this.hasStyleNameChanged(nextProps, styleNames)
         );
       }
@@ -324,39 +281,19 @@ export default (
         return addedProps;
       }
 
-      getOrSetStylesInCache(context, props, styleNames, path) {
-        if (themeCache && themeCache[path.join(">")]) {
-          // console.log('**************');
-
-          return themeCache[path.join(">")];
-        } else {
-          const resolvedStyle = this.resolveStyle(context, props, styleNames);
-          if (Object.keys(themeCache).length < 10000) {
-            themeCache[path.join(">")] = resolvedStyle;
-          }
-          return resolvedStyle;
-        }
-      }
-
-      resolveStyle(context, props, styleNames) {
-        let parentStyle = {};
-
-        const theme = getTheme(context);
-        const themeStyle = theme.createComponentStyle(
+      resolveStyle(theme, props, styleNames) {
+        const themeObj = getTheme(theme);
+        const themeStyle = themeObj.createComponentStyle(
           componentStyleName,
           componentStyle
         );
 
-        if (context.parentPath) {
-          parentStyle = themeCache[context.parentPath.join(">")];
-        } else {
-          parentStyle = resolveComponentStyle(
-            componentStyleName,
-            styleNames,
-            themeStyle,
-            parentStyle
-          );
-        }
+        const parentStyle = resolveComponentStyle(
+          componentStyleName,
+          styleNames,
+          themeStyle,
+          {}
+        );
 
         return resolveComponentStyle(
           componentStyleName,
@@ -375,7 +312,8 @@ export default (
        */
       resolveConnectedComponentStyle(props) {
         const styleNames = this.resolveStyleNames(props);
-        return this.resolveStyle(this.context, props, styleNames)
+        const theme = this.context;
+        return this.resolveStyle(theme, props, styleNames)
           .componentStyle;
       }
 
