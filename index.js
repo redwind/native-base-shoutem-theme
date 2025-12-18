@@ -1,6 +1,6 @@
 import connectStyle, { clearThemeCache } from "./src/connectStyle";
 import { INCLUDE } from "./src/resolveIncludes";
-import StyleProvider from "./src/StyleProvider";
+import StyleProvider,{ ThemeContext } from "./src/StyleProvider";
 import Theme, { ThemeShape } from "./src/Theme";
 import { createVariations, createSharedStyle } from "./src/addons";
 
@@ -9,6 +9,7 @@ export {
   clearThemeCache,
   INCLUDE,
   StyleProvider,
+  ThemeContext,
   Theme,
   ThemeShape,
   createVariations,
